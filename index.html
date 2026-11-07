@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 <title>ニッチ争奪ゲーム デジタル体験版</title>
-<!-- version 0.1.7 -->
+<!-- version 0.2.1 -->
 <style>
 /* ========================================
    基本スタイル
@@ -948,6 +948,58 @@ img.token{
   .rule-content.cards-content{ padding: 16px 12px; }
 }
 
+/* ========================================
+   オンライン（参加画面・待合室・中断）
+======================================== */
+.ol-sec{ border-top: 1px solid #ddd; padding: 14px 0 6px; margin: 0 auto; max-width: 360px; }
+.ol-sec:first-of-type{ border-top: none; padding-top: 4px; }
+.tinput{
+  display:block; width:100%; box-sizing:border-box; padding:12px 14px; font-size:20px; font-weight:700;
+  border-radius:10px; border:2px solid #bbb; background:#fff; color:#222; font-family:inherit; text-align:center;
+}
+.tinput:focus{ outline:none; border-color:#2e7d32; }
+.tinput::placeholder{ color:#bbb; font-weight:400; }
+.tinput.code{ letter-spacing:.35em; text-indent:.35em; font-size:26px; font-variant-numeric: tabular-nums; }
+.join-lead{ font-size:14px !important; font-weight:700; color:#333 !important; text-align:center; line-height:1.6; margin: 0 0 10px 0 !important; }
+.join-msg{ min-height: 1.4em; color:#c62828 !important; font-weight:700; margin: 8px 0 !important; }
+.join-msg.wait{ color:#555 !important; font-weight:400; }
+.setup-actions{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top: 8px; }
+.btn-go{
+  padding:12px 28px; font-size:16px; font-weight:700; border-radius:10px;
+  border:2px solid #2e7d32; background:#2e7d32; color:#fff;
+}
+.btn-go:hover:not(:disabled){ background:#1b5e20; }
+.btn-go:disabled{ background:#ccc; border-color:#bbb; color:#fff; }
+.btn-back{ border-radius:10px; }
+.setup-actions .btn-back{ padding:12px 22px; font-size:15px; }
+
+.room-code{ font-size:40px !important; font-weight:700; letter-spacing:.22em; text-indent:.22em; color:#2e7d32 !important; margin: 0 0 2px 0 !important; font-variant-numeric: tabular-nums; }
+.room-who{ font-size:13px !important; color:#666 !important; margin: 0 0 6px 0 !important; }
+.lb-h{ font-size:15px; margin: 0 0 8px 0; color:#333; }
+.lb-list{ display:flex; flex-direction:column; gap:6px; margin-bottom: 8px; }
+.lb-row{
+  display:flex; align-items:center; gap:8px; padding:8px 12px; border-radius:10px;
+  background:#f5f5f5; border:2px solid #e0e0e0; text-align:left;
+}
+.lb-row.me{ border-color:#2e7d32; background:#eef7ef; }
+.lb-row .nm{ font-weight:700; font-size:16px; color:#333; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.lb-row .st{ font-size:12px; color:#777; white-space:nowrap; }
+.lb-tag{ font-size:11px; font-weight:700; padding:2px 8px; border-radius:99px; white-space:nowrap; }
+.lb-tag.host{ background:#FDF0E4; color:#d9822b; border:1px solid #d9822b; }
+.lb-tag.me{ background:#E7F3ED; color:#2e7d32; border:1px solid #2e7d32; }
+.lb-row.empty{ background:transparent; border-style:dashed; }
+.lb-row.empty .nm{ color:#aaa; font-weight:400; font-size:14px; }
+#lobbyCount{ margin-bottom: 8px; }
+#lobbyCount button{ min-width:80px; padding:10px; }
+#lobbyCount button.on{ background:#2e7d32; color:#fff; }
+#lobbyCount button:disabled{ border-color:#ccc; color:#aaa; background:#f3f3f3; cursor:default; }
+#lobbyCount button.on:disabled{ background:#8bb98d; border-color:#8bb98d; color:#fff; }
+.hint{ font-size:12px !important; color:#666 !important; line-height:1.7; margin: 6px 0 8px 0 !important; }
+.hint.left{ text-align:left; }
+.hint.strong{ font-size:13px !important; color:#2e7d32 !important; font-weight:700; margin-top: 12px !important; min-height: 1.2em; text-align:center; }
+.break-content{ max-width: 92vw; width: 420px; }
+.break-msg{ font-size:14px; color:#444; line-height:1.7; margin: 0 0 16px 0; }
+
 </style>
 </head>
 
@@ -962,7 +1014,7 @@ img.token{
   </div>
   <div class="start-buttons">
     <button id="btnStart">CPUと対戦</button>
-    <button id="btnOnline" disabled>オンライン対戦<small>（準備中）</small></button>
+    <button id="btnOnline">オンライン対戦</button>
     <button id="btnRule">ルール説明</button>
     <button id="btnCards">動物カード一覧</button>
   </div>
@@ -994,6 +1046,67 @@ img.token{
     <p class="cards-note">画像をクリックすると拡大します。</p>
     <div class="card-grid" id="cardGrid"></div>
     <button class="rule-close" id="btnCardsClose">閉じる</button>
+  </div>
+</div>
+
+<!-- オンライン：参加画面 -->
+<div class="start-screen hidden" id="joinScreen">
+  <img class="start-logo" src="images/rogo.png" alt="ニッチ争奪ゲーム デジタル体験版">
+  <div class="setup-box">
+    <h2>オンライン対戦</h2>
+    <div class="ol-sec">
+      <input id="joinName" class="tinput" type="text" placeholder="名前入力" autocomplete="off" spellcheck="false">
+      <p class="hint left">※4文字まで（ひらがな・カタカナ・英数字のみ）</p>
+    </div>
+    <div class="ol-sec">
+      <p class="join-lead">対戦相手と同じ5桁の数字を入力してください<br>（数字は自由に決められます）</p>
+      <input id="joinCode" class="tinput code" type="text" inputmode="numeric" maxlength="5" placeholder="00000" autocomplete="off">
+    </div>
+    <p class="join-msg" id="joinMsg"></p>
+    <div class="setup-actions">
+      <button class="btn-go" id="btnJoinGo" disabled>対戦する</button>
+      <button class="btn-back" id="btnJoinBack">戻る</button>
+    </div>
+  </div>
+</div>
+
+<!-- オンライン：待合室 -->
+<div class="start-screen hidden" id="lobbyScreen">
+  <img class="start-logo" src="images/rogo.png" alt="ニッチ争奪ゲーム デジタル体験版">
+  <div class="setup-box">
+    <h2>オンライン対戦</h2>
+    <p class="room-code" id="lobbyCode">00000</p>
+    <p class="room-who" id="lobbyWho"></p>
+    <div class="ol-sec">
+      <h3 class="lb-h">参加者</h3>
+      <div class="lb-list" id="lobbyList"></div>
+    </div>
+    <div class="ol-sec">
+      <h3 class="lb-h">人数（ホストが決める）</h3>
+      <div class="count-btns" id="lobbyCount">
+        <button data-n="2">2人</button>
+        <button data-n="3">3人</button>
+        <button data-n="4">4人</button>
+      </div>
+      <p class="hint left" id="lobbyCountNote"></p>
+    </div>
+    <div class="setup-actions">
+      <button class="btn-go" id="btnLobbyStart" disabled>ゲーム開始</button>
+      <button class="btn-back" id="btnLobbyLeave">戻る</button>
+    </div>
+    <p class="hint strong" id="lobbyNote"></p>
+  </div>
+</div>
+
+<!-- オンライン：中断 -->
+<div class="select-player-overlay hidden" id="breakDialog">
+  <div class="select-player-content break-content">
+    <div class="select-player-title" id="breakTitle">ゲームが中断されました</div>
+    <p class="break-msg" id="breakMsg"></p>
+    <div class="setup-actions">
+      <button class="btn-go" id="btnBreakLobby">待合室に戻る</button>
+      <button class="btn-back" id="btnBreakTitle">タイトルに戻る</button>
+    </div>
   </div>
 </div>
 
@@ -1042,6 +1155,7 @@ img.token{
       <p>　本来の「ニッチ争奪ゲーム」は、アナログのボードゲームです。</p>
     </div>
     <img class="result-photo" src="images/photo02.png" alt="ボードゲームイメージ">
+    <button class="result-btn-title" id="btnResultLobby" style="display:none">待合室に戻る</button>
     <button class="result-btn-title" id="btnResultTitle">タイトルに戻る</button>
   </div>
 </div>
@@ -1100,8 +1214,11 @@ img.token{
   </div>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script>
-window.__VER__ = "0.1.7";
+window.__VER__ = "0.2.1";
 /* カードデータ（元の CARD_DATA をそのまま） */
 const CARD_DATA = [
     { id:"AN01", hand:"card01", token:"token01", name:"アオサギ", spaces:["湿地"], diets:["虫","小動物"], allowed:"9,13", power:"B", points:3, note:"", effect_id:"E05", effect_type:"置いたとき", effect_text:"プレイヤーを１人選び、その手札を見る。" },
@@ -1570,6 +1687,243 @@ const NET = (() => {
   };
 })();
 
+/* ========================================
+   オンライン対戦（Firebase Realtime Database）
+
+   rooms/{5桁}/
+     players/{id}  : { name, joined, where:"lobby"|"game"|"result" }  切断すると自動で消える
+     settings/n    : 何人で遊ぶか（ホストが決める）
+     game          : { no, seats:[{id,name}|{cpu:true,name}], seed }  ホストが開始時に書く
+     actions/{no}/a0000, a0001, … : 操作の並び（全員が同じ順に受け取って同じ盤面にする）
+     updated       : 最後に動きがあった時刻
+
+   - ホストは「いちばん早く入った人」。CPU の操作はホストの端末が作って送る。
+   - 席の id は端末ごと（タブごと）に作る。同じブラウザの別タブでも別の人になる。
+======================================== */
+const ONLINE = (() => {
+  "use strict";
+
+  const CONFIG = {
+    apiKey: "AIzaSyA75yu2g5r99PAqZto41E91mTn-sAlMphM",
+    authDomain: "niche-game-online-demo.firebaseapp.com",
+    databaseURL: "https://niche-game-online-demo-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "niche-game-online-demo",
+    storageBucket: "niche-game-online-demo.firebasestorage.app",
+    messagingSenderId: "265466258622",
+    appId: "1:265466258622:web:fa3eada776420698fbaaef",
+  };
+  const MAX_PLAYERS = 4;
+  const STALE_MS = 3 * 60 * 60 * 1000;  /* 3時間動きのない部屋は、次に誰かが入るときに片づける */
+
+  let db = null, ready = null, TS = null;
+  const R = {
+    code: null, me: null, ref: null,
+    players: {}, settings: {}, game: null,
+    gameNo: null, recv: 0, actRef: null, playing: false,
+    wasConnected: false,
+    hooks: {},
+  };
+  const subs = [];
+
+  const sdkOK = () => typeof firebase !== "undefined" && !!firebase.database && !!firebase.auth;
+  const emit = (name, ...args) => { const f = R.hooks[name]; if (f) f(...args); };
+
+  function init() {
+    if (!sdkOK()) return Promise.reject(new Error("sdk"));
+    if (!ready) {
+      if (!firebase.apps || !firebase.apps.length) firebase.initializeApp(CONFIG);
+      db = firebase.database();
+      TS = firebase.database.ServerValue.TIMESTAMP;
+      ready = firebase.auth().signInAnonymously();
+    }
+    return ready;
+  }
+
+  function on(ref, type, fn) {
+    ref.on(type, fn, err => emit("error", err));
+    subs.push(() => ref.off(type, fn));
+  }
+  function offAll() {
+    while (subs.length) subs.pop()();
+    if (R.actRef) { R.actRef.off(); R.actRef = null; }
+  }
+
+  function newId() {
+    const a = new Uint8Array(8);
+    (window.crypto || {}).getRandomValues ? crypto.getRandomValues(a) : a.forEach((_, i) => a[i] = Math.random() * 256);
+    return "p" + Array.from(a, b => b.toString(16).padStart(2, "0")).join("");
+  }
+
+  /* 参加者を、入った順に並べる */
+  function list() {
+    return Object.entries(R.players || {})
+      .map(([id, p]) => Object.assign({ id }, p))
+      .sort((a, b) => (a.joined || 0) - (b.joined || 0) || (a.id < b.id ? -1 : 1));
+  }
+  const hostId = () => { const l = list(); return l.length ? l[0].id : null; };
+  const isHost = () => !!R.code && hostId() === R.me;
+
+  /* ---------- 入る ---------- */
+  async function join(code, name) {
+    await init();
+    const ref = db.ref("rooms/" + code);
+    const snap = await ref.once("value");
+    const room = snap.val();
+    if (room) {
+      const ps = Object.values(room.players || {});
+      const stale = room.updated && Date.now() - room.updated > STALE_MS;
+      if (ps.length === 0 || stale) await ref.remove();
+      else {
+        if (ps.length >= MAX_PLAYERS) throw new Error("full");
+        if (ps.some(p => p.where === "game")) throw new Error("playing");
+        if (ps.some(p => p.name === name)) throw new Error("samename");
+      }
+    }
+    R.me = newId();
+    R.code = code;
+    R.ref = ref;
+    R.players = {}; R.settings = {}; R.game = null;
+    R.gameNo = null; R.recv = 0; R.playing = false;
+    const pref = ref.child("players/" + R.me);
+    await pref.onDisconnect().remove();
+    await pref.set({ name, joined: TS, where: "lobby" });
+    ref.child("updated").set(TS);
+
+    /* 部屋が変わったら知らせる */
+    let firstGame = true;
+    on(ref.child("players"), "value", s => {
+      R.players = s.val() || {};
+      if (R.code && !R.players[R.me]) { emit("lost", "removed"); return; }
+      checkMembers();
+      emit("change");
+    });
+    on(ref.child("settings"), "value", s => { R.settings = s.val() || {}; emit("change"); });
+    on(ref.child("game"), "value", s => {
+      const g = s.val();
+      /* 入ったときにすでにあった game は、前の対局のものなので無視する */
+      if (firstGame) { firstGame = false; R.game = g; R.gameNo = g ? g.no : 0; return; }
+      R.game = g;
+      if (g && g.no !== R.gameNo) startFromRoom(g);
+    });
+    R.wasConnected = false;
+    on(db.ref(".info/connected"), "value", s => {
+      if (s.val() === true) R.wasConnected = true;
+      else if (R.wasConnected && R.code) emit("lost", "network");
+    });
+    return R.me;
+  }
+
+  /* ---------- 出る ---------- */
+  async function leave() {
+    if (!R.code) return;
+    const ref = R.ref, me = R.me;
+    const alone = Object.keys(R.players || {}).filter(id => id !== me).length === 0;
+    offAll();
+    R.code = null;
+    R.gameNo = null;
+    R.playing = false;
+    try {
+      const pref = ref.child("players/" + me);
+      await pref.onDisconnect().cancel();
+      if (alone) await ref.remove();
+      else { await pref.remove(); await ref.child("updated").set(TS); }
+    } catch (e) { /* 切れているときは何もしない */ }
+  }
+
+  function setWhere(w) {
+    if (!R.code) return;
+    if (w !== "game") R.playing = false;
+    R.ref.child("players/" + R.me + "/where").set(w);
+    R.ref.child("updated").set(TS);
+  }
+  function setCount(n) {
+    if (isHost()) R.ref.child("settings/n").set(n);
+  }
+
+  /* ---------- 開始（ホスト） ----------
+     人間の順番をランダムに決め、空いた席にCPUを入れて、早い順に CPU 1, 2, 3 */
+  function count() {
+    const humans = list().length;
+    return Math.max(2, humans, Math.min(MAX_PLAYERS, Number(R.settings.n) || MAX_PLAYERS));
+  }
+  function canStart() {
+    const l = list();
+    return isHost() && l.length >= 2 && l.every(p => p.where === "lobby");
+  }
+  async function start() {
+    if (!canStart()) return;
+    const humans = list();
+    const n = count();
+    const pos = Array.from({ length: n }, (_, i) => i);
+    for (let i = n - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pos[i], pos[j]] = [pos[j], pos[i]]; }
+    const seats = Array(n).fill(null);
+    humans.forEach((p, k) => { seats[pos[k]] = { id: p.id, name: p.name }; });
+    let c = 0;
+    for (let s = 0; s < n; s++) if (!seats[s]) seats[s] = { cpu: true, name: "CPU " + (++c) };
+    const no = Math.max(R.gameNo || 0, R.game ? R.game.no : 0) + 1;
+    const seed = (Math.random() * 4294967296) >>> 0;
+    await R.ref.update({ actions: null, game: { no, seats, seed }, updated: TS });
+  }
+
+  function startFromRoom(g) {
+    /* Firebase は配列を（まれに）番号つきのオブジェクトで返すので、そろえておく */
+    if (!Array.isArray(g.seats)) g.seats = Object.keys(g.seats).sort((x, y) => x - y).map(k => g.seats[k]);
+    const me = g.seats.findIndex(s => s.id === R.me);
+    if (me < 0) return;               /* 自分の入っていない対局（あとから入った人など） */
+    if (R.actRef) { R.actRef.off(); R.actRef = null; }
+    R.gameNo = g.no;
+    R.recv = 0;
+    R.playing = true;
+    setWhere("game");
+    emit("game", {
+      players: g.seats.map(s => ({ name: s.name, cpu: !!s.cpu })),
+      me, seed: g.seed, ids: g.seats.map(s => s.id || null),
+    });
+    R.actRef = R.ref.child("actions/" + g.no);
+    R.actRef.orderByKey().on("child_added", s => {
+      if (g.no !== R.gameNo) return;
+      R.recv++;
+      emit("action", s.val());
+    }, err => emit("error", err));
+  }
+
+  /* 対局中に誰かがいなくなったら中断 */
+  function checkMembers() {
+    if (!R.playing || !R.game || R.game.no !== R.gameNo) return;
+    const seats = Array.isArray(R.game.seats) ? R.game.seats : Object.values(R.game.seats);
+    const gone = seats.filter(s => s.id && !R.players[s.id]);
+    if (gone.length) emit("member-left", gone.map(s => s.name));
+  }
+
+  /* ---------- 操作を送る ----------
+     並びの番号（受け取った数）の場所に書く。すでに埋まっていたら書かない。 */
+  function send(a) {
+    if (!R.code || R.gameNo === null) return;
+    const key = "a" + String(R.recv).padStart(4, "0");
+    R.ref.child("actions/" + R.gameNo + "/" + key).transaction(
+      cur => (cur === null ? a : undefined),
+      (err, committed) => { if (err || !committed) emit("send-failed", err); },
+      false
+    );
+    R.ref.child("updated").set(TS);
+  }
+
+  const DRIVER = {
+    get isHost() { return isHost(); },
+    send,
+    close() {},
+  };
+
+  return {
+    DRIVER, join, leave, start, setWhere, setCount, canStart, count, list, isHost, sdkOK,
+    get code() { return R.code; },
+    get me() { return R.me; },
+    get playing() { return R.playing; },
+    hooks(h) { Object.assign(R.hooks, h); },
+    MAX_PLAYERS,
+  };
+})();
+
 (() => {
   "use strict";
   /* ========================================
@@ -1735,6 +2089,8 @@ const NET = (() => {
     viewDone: null,   /* 手札を見る画面を閉じたら呼ぶ */
     speed: 1,         /* 演出の速さ（確認用） */
     auto: false,      /* 自分の席もCPUに任せる（確認用） */
+    online: false,    /* オンライン対戦中か */
+    halt: false,      /* 中断した（もう操作を受け付けない） */
   };
   const cellViews = [];
 
@@ -1780,11 +2136,11 @@ const NET = (() => {
   }
   function canPlace() {
     const S = G.S;
-    return !!S && !S.over && !G.busy && !G.waiting && !S.pending && S.turn === G.me && !G.auto;
+    return !!S && !S.over && !G.halt && !G.busy && !G.waiting && !S.pending && S.turn === G.me && !G.auto;
   }
   function myPending(kind) {
     const S = G.S;
-    return !!S && !S.over && !G.busy && !G.waiting && !!S.pending &&
+    return !!S && !S.over && !G.halt && !G.busy && !G.waiting && !!S.pending &&
       S.pending.seat === G.me && S.pending.kind === kind && !G.auto;
   }
 
@@ -2200,7 +2556,7 @@ const NET = (() => {
   /* 演出が終わって落ち着いたとき：次に動く人を決める */
   function settle() {
     const S = G.S;
-    if (!S) return;
+    if (!S || G.halt) return;
     G.V = clone(S.board);
     renderAll();
     if (S.over) { endGame(); return; }
@@ -2210,8 +2566,9 @@ const NET = (() => {
       if (pd && pd.kind === "seat") showSelectDialog(pd);
       return;
     }
-    const isCpu = S.players[a].cpu || (a === G.me && G.auto);
-    if (isCpu && NET.isHost) {
+    /* CPUの席はホストだけが動かす。確認用の「自分もCPUに任せる」は自分の端末が動かす */
+    const mine = a === G.me && G.auto;
+    if ((S.players[a].cpu && NET.isHost) || mine) {
       const gen = G.gen;
       clearTimeout(G.cpuTimer);
       G.cpuTimer = setTimeout(() => {
@@ -2325,6 +2682,7 @@ const NET = (() => {
     capturedBoard = $board.cloneNode(true);
     capturedBoard.querySelectorAll(".tokenWrap").forEach(tw => tw.classList.remove(...FX));
     capturedBoard.querySelectorAll(".cell").forEach(c => c.classList.remove("disabled", "condition-not-met", "effect-selectable"));
+    if (G.online) ONLINE.setWhere("result");
     const gen = G.gen;
     G.resultTimer = setTimeout(() => { if (gen === G.gen) showResult(); }, 1000 * G.speed);
   }
@@ -2372,6 +2730,7 @@ const NET = (() => {
       $resultAnimals.parentNode.insertBefore(ev, $resultAnimals.nextSibling);
     }
     ev.innerHTML = `<div class="eval-total">合計 ${total}点</div><div class="eval-text">評価： ${evaluation}</div>`;
+    $("btnResultLobby").style.display = G.online ? "" : "none";
     $resultScreen.scrollTop = 0;
     $resultScreen.classList.remove("hidden");
   }
@@ -2414,6 +2773,7 @@ const NET = (() => {
     G.waiting = false;
     G.sel = null;
     G.viewDone = null;
+    G.halt = false;
     capturedBoard = null;
     $log.textContent = "";
     logQueue.length = 0;
@@ -2455,6 +2815,7 @@ const NET = (() => {
   /* 1人で遊ぶ：まず「あなた」の順番をランダムに決め、
      残りのCPUを早い順に CPU 1、CPU 2、CPU 3 とする */
   function startSolo(n) {
+    G.online = false;
     const me = Math.floor(Math.random() * n);
     const players = [];
     let k = 0;
@@ -2464,6 +2825,7 @@ const NET = (() => {
   }
 
   function returnToTitle() {
+    if (G.online) { ONLINE.leave(); G.online = false; NET.use(NET.LOCAL); }
     resetView();
     G.S = null;
     G.V = null;
@@ -2478,6 +2840,9 @@ const NET = (() => {
     $ruleModal.classList.remove("show");
     $("cardsModal").classList.remove("show");
     $setupScreen.classList.add("hidden");
+    $("joinScreen").classList.add("hidden");
+    $("lobbyScreen").classList.add("hidden");
+    $("breakDialog").classList.add("hidden");
     hideSelectDialog();
     for (const v of cellViews) {
       v.tokenWrap.style.display = "none";
@@ -2491,7 +2856,11 @@ const NET = (() => {
      ボタン
   ======================================== */
   NET.onAction(onAction);
-  $("btnNew").addEventListener("click", returnToTitle);
+  $("btnNew").addEventListener("click", () => {
+    if (G.online && G.S && !G.S.over && !G.halt &&
+        !window.confirm("部屋を出てタイトルに戻りますか？\nほかの人のゲームは中断されます。")) return;
+    returnToTitle();
+  });
   $("btnResultTitle").addEventListener("click", returnToTitle);
   $btnCancel.addEventListener("click", cancelSelection);
   $("btnStart").addEventListener("click", () => {
@@ -2587,6 +2956,257 @@ const NET = (() => {
 
   /* 動作確認用の入口（画面には出ない） */
   window.__NICHE = { G, RULES, CPU, NET, startSolo, startGame, settle };
+
+  /* ========================================
+     オンライン対戦の画面（部屋に入る・待合室・中断）
+  ======================================== */
+  const $join = $("joinScreen"), $lobby = $("lobbyScreen"), $break = $("breakDialog");
+  const $joinName = $("joinName"), $joinCode = $("joinCode"), $joinMsg = $("joinMsg"), $joinGo = $("btnJoinGo");
+  const $lobbyList = $("lobbyList"), $lobbyCount = $("lobbyCount");
+
+  function showScreen(el) {
+    for (const e of [$startScreen, $setupScreen, $join, $lobby]) e.classList.toggle("hidden", e !== el);
+    if (el) el.scrollTop = 0;
+  }
+
+  /* ---------- 参加画面 ----------
+     名前は分類組合せゲームと同じ決まり：
+     ひらがな・カタカナ・英数字（半角・全角）と、決めた記号だけ。4文字まで。
+     使えない文字は打った時点で消す（日本語入力の変換中は待つ）。 */
+  const NAME_MAX = 4;
+  const NAME_MARKS =
+    "・‐※＊＃％＆！？／＼￥＄＋÷×＝＠" +
+    "～‘’“”：（）＜＞［］｛｝" +
+    "☆★□■○●△▲▽▼◇◆";
+  function nameCharOK(ch) {
+    if (NAME_MARKS.includes(ch)) return true;
+    const c = ch.codePointAt(0);
+    if (c >= 0x3041 && c <= 0x3096) return true;                  /* ひらがな */
+    if (c >= 0x30a1 && c <= 0x30fa) return true;                  /* カタカナ */
+    if (c === 0x30fc || c === 0x309b || c === 0x309c) return true; /* ー ゛ ゜ */
+    if (ch >= "0" && ch <= "9") return true;
+    if (ch >= "A" && ch <= "Z") return true;
+    if (ch >= "a" && ch <= "z") return true;
+    if (c >= 0xff10 && c <= 0xff19) return true;                  /* 全角数字 */
+    if (c >= 0xff21 && c <= 0xff3a) return true;                  /* 全角英大 */
+    if (c >= 0xff41 && c <= 0xff5a) return true;                  /* 全角英小 */
+    return false;
+  }
+  const cleanName = s => Array.from(String(s)).filter(nameCharOK).slice(0, NAME_MAX).join("");
+  const cleanCode = s => String(s).replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/\D/g, "").slice(0, 5);
+
+  /* 戻ってきたときのために入力を覚えておく */
+  const JOIN = { name: "", code: "" };
+  try { JOIN.name = cleanName(localStorage.getItem("niche.name") || ""); } catch (e) {}
+
+  function joinValid() { return JOIN.name.length > 0 && JOIN.code.length === 5; }
+  function setJoinMsg(t, wait) {
+    $joinMsg.textContent = t || "";
+    $joinMsg.classList.toggle("wait", !!wait);
+  }
+  function openJoin() {
+    $joinName.value = JOIN.name;
+    $joinCode.value = JOIN.code;
+    setJoinMsg("");
+    $joinGo.disabled = !joinValid();
+    showScreen($join);
+  }
+  function syncName() {
+    const v = cleanName($joinName.value);
+    if (v !== $joinName.value) $joinName.value = v;
+    JOIN.name = v;
+    $joinGo.disabled = !joinValid();
+  }
+  $("btnOnline").addEventListener("click", openJoin);
+  $("btnJoinBack").addEventListener("click", () => showScreen($startScreen));
+  $joinName.addEventListener("input", e => { if (!e.isComposing) syncName(); });
+  $joinName.addEventListener("compositionend", syncName);
+  $joinCode.addEventListener("input", () => {
+    const v = cleanCode($joinCode.value);
+    if (v !== $joinCode.value) $joinCode.value = v;
+    JOIN.code = v;
+    $joinGo.disabled = !joinValid();
+  });
+  for (const el of [$joinName, $joinCode]) {
+    el.addEventListener("keydown", e => { if (e.key === "Enter" && !e.isComposing && joinValid() && !$joinGo.disabled) $joinGo.click(); });
+  }
+
+  const JOIN_ERR = {
+    sdk: "通信の部品を読み込めませんでした。インターネットにつながっているか確かめてください。",
+    full: "この部屋は、もう4人そろっています。",
+    playing: "この部屋では対局中です。終わってから入ってください。",
+    samename: "同じ名前の人がいます。別の名前にしてください。",
+  };
+  $joinGo.addEventListener("click", async () => {
+    syncName();
+    if (!joinValid()) return;
+    const name = JOIN.name, code = JOIN.code;
+    $joinGo.disabled = true;
+    setJoinMsg("つないでいます…", true);
+    try {
+      await ONLINE.join(code, name);
+      try { localStorage.setItem("niche.name", name); } catch (e) {}
+      G.online = true;
+      NET.use(ONLINE.DRIVER);
+      setJoinMsg("");
+      showLobby();
+    } catch (e) {
+      const k = e && e.message;
+      setJoinMsg(JOIN_ERR[k] || ("部屋に入れませんでした（" + (e && (e.code || e.message) || "不明なエラー") + "）"));
+      $joinGo.disabled = !joinValid();
+      if (!JOIN_ERR[k]) console.error(e);
+    }
+  });
+
+  /* ---------- 待合室 ---------- */
+  const WHERE = { lobby: "待合室にいます", result: "結果を見ています", game: "対局中" };
+  function showLobby() {
+    $resultScreen.classList.add("hidden");
+    $break.classList.add("hidden");
+    showScreen($lobby);
+    renderLobby();
+  }
+  function renderLobby() {
+    if (!ONLINE.code) return;
+    $("lobbyCode").textContent = ONLINE.code;
+    const l = ONLINE.list();
+    const host = l.length ? l[0].id : null;
+    $lobbyList.textContent = "";
+    for (const p of l) {
+      const row = document.createElement("div");
+      row.className = "lb-row";
+      const nm = document.createElement("span");
+      nm.className = "nm";
+      nm.textContent = p.name;
+      row.appendChild(nm);
+      if (p.id === host) { const t = document.createElement("span"); t.className = "lb-tag host"; t.textContent = "ホスト"; row.appendChild(t); }
+      if (p.id === ONLINE.me) { const t = document.createElement("span"); t.className = "lb-tag me"; t.textContent = "あなた"; row.appendChild(t); row.classList.add("me"); }
+      const st = document.createElement("span");
+      st.className = "st";
+      st.textContent = WHERE[p.where] || "";
+      row.appendChild(st);
+      $lobbyList.appendChild(row);
+    }
+    for (let k = l.length; k < ONLINE.MAX_PLAYERS; k++) {
+      const row = document.createElement("div");
+      row.className = "lb-row empty";
+      row.innerHTML = '<span class="nm">空き</span>';
+      $lobbyList.appendChild(row);
+    }
+
+    const host_ = ONLINE.isHost();
+    const n = ONLINE.count();
+    $("lobbyWho").textContent = `あなたは${host_ ? "ホスト" : "ゲスト"}です`;
+    $lobbyCount.querySelectorAll("button").forEach(b => {
+      const v = Number(b.dataset.n);
+      b.classList.toggle("on", v === n);
+      b.disabled = !host_ || v < l.length;
+    });
+    const cpu = n - l.length;
+    $("lobbyCountNote").textContent =
+      "※参加者が人数より少ない場合、残りはCPUになります" + (cpu > 0 ? `（いまはCPU ${cpu}人）` : "") +
+      "。順番はゲーム開始時にランダムで決まります。";
+
+    const $go = $("btnLobbyStart");
+    $go.disabled = !ONLINE.canStart();
+    const notReady = l.filter(p => p.where !== "lobby" && p.id !== ONLINE.me);
+    let note = "";
+    if (!host_) note = "ホストが始めるのを待っています。";
+    else if (l.length < 2) note = "ほかの人が入るのを待っています。";
+    else if (notReady.length) note = notReady.map(p => p.name + "さん").join("、") + "が待合室に戻るのを待っています。";
+    $("lobbyNote").textContent = note;
+  }
+  $lobbyCount.querySelectorAll("button").forEach(b => b.addEventListener("click", () => ONLINE.setCount(Number(b.dataset.n))));
+  $("btnLobbyStart").addEventListener("click", () => { $("btnLobbyStart").disabled = true; ONLINE.start(); });
+  /* 戻る：部屋を出て参加画面へ（入力した名前と数字は残る） */
+  $("btnLobbyLeave").addEventListener("click", () => {
+    ONLINE.leave();
+    G.online = false;
+    NET.use(NET.LOCAL);
+    openJoin();
+  });
+  $("btnResultLobby").addEventListener("click", () => { ONLINE.setWhere("lobby"); showLobby(); });
+
+  /* ---------- 中断 ---------- */
+  function interrupt(msg, canLobby) {
+    if (!G.online) return;
+    G.gen++;
+    clearTimeout(G.cpuTimer); G.cpuTimer = null;
+    clearTimeout(G.resultTimer); G.resultTimer = null;
+    G.queue.length = 0;
+    G.busy = false;
+    G.waiting = false;
+    G.sel = null;
+    G.viewDone = null;
+    G.halt = true;
+    const S = G.S;
+    hideSelectDialog();
+    $modal.classList.remove("show");
+    if (S) { renderHand(); updateCellDisabled(); }
+    $infoBox.innerHTML = '<span class="message">ゲームを中断しました</span>';
+    $("breakTitle").textContent = "ゲームが中断されました";
+    $("breakMsg").textContent = msg;
+    $("btnBreakLobby").style.display = canLobby ? "" : "none";
+    $resultScreen.classList.add("hidden");
+    log("ゲームを中断しました", "warn");
+    $break.classList.remove("hidden");
+  }
+  $("btnBreakLobby").addEventListener("click", () => {
+    $break.classList.add("hidden");
+    ONLINE.setWhere("lobby");
+    showLobby();
+  });
+  $("btnBreakTitle").addEventListener("click", () => { $break.classList.add("hidden"); returnToTitle(); });
+
+  /* 届いている操作をすべて進めると終わっている（＝もう決着している）か */
+  function finishedAnyway() {
+    if (!G.S) return true;
+    if (G.S.over) return true;
+    const T = clone(G.S);
+    for (const a of G.queue) RULES.apply(T, a);
+    return T.over;
+  }
+
+  /* ---------- 通信からの知らせ ---------- */
+  ONLINE.hooks({
+    change() {
+      if (!$lobby.classList.contains("hidden")) renderLobby();
+    },
+    game(opt) {
+      $break.classList.add("hidden");
+      $resultScreen.classList.add("hidden");
+      showScreen(null);
+      startGame({ players: opt.players, me: opt.me, seed: opt.seed, first: 0 });
+    },
+    action(a) {
+      if (!G.halt) onAction(a);
+    },
+    "member-left"(names) {
+      if (G.halt || finishedAnyway()) return;
+      interrupt(names.map(n => n + "さん").join("、") + "が部屋を出たため、ゲームを中断しました。", true);
+    },
+    lost(kind) {
+      if (!G.online) return;
+      const msg = kind === "network"
+        ? "通信が切れたため、部屋から出ました。インターネットのつながりを確かめて、もう一度入ってください。"
+        : "部屋から出ました。もう一度入ってください。";
+      ONLINE.leave();
+      if (G.S && !G.S.over && !G.halt) interrupt(msg, false);
+      else {
+        $("breakTitle").textContent = "通信が切れました";
+        $("breakMsg").textContent = msg;
+        $("btnBreakLobby").style.display = "none";
+        $break.classList.remove("hidden");
+      }
+    },
+    "send-failed"(err) {
+      G.waiting = false;
+      log("操作を送れませんでした。もう一度やり直してください。", "warn");
+      if (err) console.error(err);
+      renderHand(); updateCellDisabled(); updateInfoBox();
+    },
+    error(err) { console.error(err); },
+  });
 
 })();
 </script>
