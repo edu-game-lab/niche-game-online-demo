@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 <title>ニッチ争奪ゲーム デジタル体験版</title>
-<!-- version 0.2.3 -->
+<!-- version 1.0.0 -->
 <style>
 /* ========================================
    基本スタイル
@@ -1213,11 +1213,8 @@ img.token{
   </div>
 </div>
 
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script>
-window.__VER__ = "0.2.3";
+window.__VER__ = "1.0.0";
 /* カードデータ（元の CARD_DATA をそのまま） */
 const CARD_DATA = [
     { id:"AN01", hand:"card01", token:"token01", name:"アオサギ", spaces:["湿地"], diets:["虫","小動物"], allowed:"9,13", power:"B", points:3, note:"", effect_id:"E05", effect_type:"置いたとき", effect_text:"プレイヤーを１人選び、その手札を見る。" },
@@ -1720,6 +1717,7 @@ const ONLINE = (() => {
     players: {}, settings: {}, game: null,
     gameNo: null, recv: 0, actRef: null, playing: false,
     wasConnected: false,
+    leaving: null,
     hooks: {},
   };
   const subs = [];
@@ -1727,13 +1725,37 @@ const ONLINE = (() => {
   const sdkOK = () => typeof firebase !== "undefined" && !!firebase.database && !!firebase.auth;
   const emit = (name, ...args) => { const f = R.hooks[name]; if (f) f(...args); };
 
-  function init() {
-    if (!sdkOK()) return Promise.reject(new Error("sdk"));
+  /* 通信の部品は「オンライン対戦」に入るときに初めて読み込む（CPU戦は通信を使わない） */
+  const SDK = ["app", "auth", "database"].map(k => `https://www.gstatic.com/firebasejs/10.12.2/firebase-${k}-compat.js`);
+  let sdkLoading = null;
+  function loadScript(src) {
+    return new Promise((res, rej) => {
+      const s = document.createElement("script");
+      s.src = src;
+      const t = setTimeout(() => rej(new Error("sdk")), 20000);
+      s.onload = () => { clearTimeout(t); res(); };
+      s.onerror = () => { clearTimeout(t); s.remove(); rej(new Error("sdk")); };
+      document.head.appendChild(s);
+    });
+  }
+  function loadSDK() {
+    if (sdkOK()) return Promise.resolve();
+    if (!sdkLoading) {
+      sdkLoading = SDK.reduce((p, src) => p.then(() => (sdkOK() ? null : loadScript(src))), Promise.resolve())
+        .then(() => { if (!sdkOK()) throw new Error("sdk"); })
+        .catch(() => { sdkLoading = null; throw new Error("sdk"); });
+    }
+    return sdkLoading;
+  }
+
+  async function init() {
+    await loadSDK();
     if (!ready) {
       if (!firebase.apps || !firebase.apps.length) firebase.initializeApp(CONFIG);
       db = firebase.database();
       TS = firebase.database.ServerValue.TIMESTAMP;
-      ready = firebase.auth().signInAnonymously();
+      /* 失敗したら次に押したときにやり直せるようにする */
+      ready = firebase.auth().signInAnonymously().catch(e => { ready = null; throw e; });
     }
     return ready;
   }
@@ -1763,7 +1785,12 @@ const ONLINE = (() => {
   const isHost = () => !!R.code && hostId() === R.me;
 
   /* ---------- 入る ---------- */
+  /* CPUと見分けがつかない名前（CPU、ＣＰＵ２ など）は使えない */
+  const looksCPU = name => /^CPU[0-9]?$/i.test(name.replace(/[Ａ-Ｚａ-ｚ０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)));
+
   async function join(code, name) {
+    if (looksCPU(name)) throw new Error("cpuname");
+    if (R.leaving) await R.leaving;   /* さっき出た部屋の片づけが終わるまで待つ */
     await init();
     const ref = db.ref("rooms/" + code);
     const snap = await ref.once("value");
@@ -1813,20 +1840,26 @@ const ONLINE = (() => {
   }
 
   /* ---------- 出る ---------- */
-  async function leave() {
-    if (!R.code) return;
+  function leave() {
+    if (!R.code) return R.leaving || Promise.resolve();
     const ref = R.ref, me = R.me;
-    const alone = Object.keys(R.players || {}).filter(id => id !== me).length === 0;
     offAll();
     R.code = null;
     R.gameNo = null;
     R.playing = false;
-    try {
-      const pref = ref.child("players/" + me);
-      await pref.onDisconnect().cancel();
-      if (alone) await ref.remove();
-      else { await pref.remove(); await ref.child("updated").set(TS); }
-    } catch (e) { /* 切れているときは何もしない */ }
+    /* 書き込みは待たずに続けて出す（順番どおりに届く）。全部終わるまでを R.leaving で覚えておく。
+       自分の席を消したあと、部屋に誰も残っていなければ部屋ごと消す。
+       「誰もいない」の判断はサーバー上で行う（ちょうど誰かが入ってきたときに消さないように） */
+    const pref = ref.child("players/" + me);
+    const done = Promise.all([
+      pref.onDisconnect().cancel(),
+      pref.remove(),
+      ref.child("updated").set(TS),
+      ref.transaction(cur => (cur && cur.players && Object.keys(cur.players).length ? undefined : null)),
+    ]).catch(() => { /* 切れているときは何もしない */ });
+    /* 通信が切れていると終わらないことがあるので、長くても3秒で待つのをやめる */
+    R.leaving = Promise.race([done, new Promise(r => setTimeout(r, 3000))]).then(() => { R.leaving = null; });
+    return R.leaving;
   }
 
   function setWhere(w) {
@@ -1886,6 +1919,8 @@ const ONLINE = (() => {
       R.recv++;
       emit("action", s.val());
     }, err => emit("error", err));
+    /* 開始の直前に誰かが出ていた場合、参加者の知らせはもう来ないので、ここで確かめる */
+    checkMembers();
   }
 
   /* 対局中に誰かがいなくなったら中断 */
@@ -3038,6 +3073,7 @@ const ONLINE = (() => {
     full: "この部屋は、もう4人そろっています。",
     playing: "この部屋では対局中です。終わってから入ってください。",
     samename: "同じ名前の人がいます。別の名前にしてください。",
+    cpuname: "CPUと見分けがつかないので、別の名前にしてください。",
   };
   $joinGo.addEventListener("click", async () => {
     syncName();
@@ -3205,7 +3241,8 @@ const ONLINE = (() => {
       G.waiting = false;
       log("操作を送れませんでした。もう一度やり直してください。", "warn");
       if (err) console.error(err);
-      renderHand(); updateCellDisabled(); updateInfoBox();
+      /* 相手を選ぶダイアログなども出し直す */
+      if (!G.busy && !G.halt) settle();
     },
     error(err) { console.error(err); },
   });
