@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 <title>ニッチ争奪ゲーム デジタル体験版</title>
-<!-- version 1.0.0 -->
+<!-- version 1.0.1 -->
 <style>
 /* ========================================
    基本スタイル
@@ -1027,12 +1027,12 @@ img.token{
 <div class="start-screen hidden" id="setupScreen">
   <img class="start-logo" src="images/rogo.png" alt="ニッチ争奪ゲーム デジタル体験版">
   <div class="setup-box">
-    <h2>何人で遊びますか？</h2>
+    <h2>何人で対戦しますか？</h2>
     <p>あなた以外はCPUになります。順番はランダムに決まります。</p>
     <div class="count-btns">
-      <button data-n="2">2人<small>CPU 1人</small></button>
-      <button data-n="3">3人<small>CPU 2人</small></button>
-      <button data-n="4">4人<small>CPU 3人</small></button>
+      <button data-n="2">2人</button>
+      <button data-n="3">3人</button>
+      <button data-n="4">4人</button>
     </div>
     <button class="btn-back" id="btnSetupBack">戻る</button>
   </div>
@@ -1214,7 +1214,7 @@ img.token{
 </div>
 
 <script>
-window.__VER__ = "1.0.0";
+window.__VER__ = "1.0.1";
 /* カードデータ（元の CARD_DATA をそのまま） */
 const CARD_DATA = [
     { id:"AN01", hand:"card01", token:"token01", name:"アオサギ", spaces:["湿地"], diets:["虫","小動物"], allowed:"9,13", power:"B", points:3, note:"", effect_id:"E05", effect_type:"置いたとき", effect_text:"プレイヤーを１人選び、その手札を見る。" },
